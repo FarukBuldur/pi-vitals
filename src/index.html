@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pi Vitals</title>
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #141414;
+    --border: #1f1f1f;
+    --green: #00ff88;
+    --yellow: #ffd700;
+    --red: #ff4444;
+    --blue: #00aaff;
+    --purple: #bb86fc;
+    --text: #e0e0e0;
+    --muted: #555;
+    --font: 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  header h1 { color: var(--green); font-size: 16px; letter-spacing: 2px; text-transform: uppercase; }
+  #status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  #dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  main { padding: 20px 24px; display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px;
+  }
+  .card-title {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 14px; display: flex;
+    align-items: center; gap: 8px;
+  }
+  .card-title span { font-size: 14px; }
+
+  .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
+  .stat-label { color: var(--muted); }
+  .stat-value { color: var(--text); font-weight: bold; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.yellow { color: var(--yellow); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.blue { color: var(--blue); }
+  .stat-value.purple { color: var(--purple); }
+
+  .bar-wrap { background: #1a1a1a; border-radius: 2px; height: 6px; margin-top: 4px; margin-bottom: 12px; }
+  .bar { height: 6px; border-radius: 2px; transition: width 0.5s ease; }
+  .bar.green { background: var(--green); }
+  .bar.yellow { background: var(--yellow); }
+  .bar.red { background: var(--red); }
+
+  /* Process table */
+  .proc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .proc-table th { color: var(--muted); text-align: left; padding: 4px 6px;
+    border-bottom: 1px solid var(--border); font-weight: normal; letter-spacing: 1px; font-size: 11px; }
+  .proc-table td { padding: 5px 6px; border-bottom: 1px solid #181818; }
+  .proc-table tr:last-child td { border-bottom: none; }
+  .proc-name { color: var(--green); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Network card spans full width */
+  .full-width { grid-column: 1 / -1; }
+
+  .net-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .net-iface { background: #0d0d0d; border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
+  .net-name { color: var(--blue); font-size: 12px; margin-bottom: 8px; letter-spacing: 1px; }
+
+  footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px;
+    border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⬡ Pi Vitals</h1>
+  <div id="status">
+    <div id="dot"></div>
+    <span id="status-text">Connecting...</span>
+    <span id="hostname" style="color:var(--text);margin-left:8px"></span>
+    <span id="uptime" style="color:var(--muted);margin-left:8px"></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- CPU -->
+  <div class="card">
+    <div class="card-title"><span>⚙</span> CPU</div>
+    <div class="stat-row">
+      <span class="stat-label">Usage</span>
+      <span class="stat-value" id="cpu-usage">—</span>
+    </div>
+    <div class="bar-wrap"><div class="bar green" id="cpu-bar" style="width:0%"></div></div>
+    <div class="stat-row">
+      <span class="stat-label">Temperature</span>
+      <span class="stat-value" id="cpu-temp">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Frequency</span>
+      <span class="stat-value blue" id="cpu-freq">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Cores</span>
+      <span class="stat-value" id="cpu-cores">—</span>
+    </div>
+  </div>
+
+  <!-- Memory -->
+  <div class="card">
+    <div class="card-title"><span>▦</span> Memory</div>
+    <div class="stat-row">
+      <span class="stat-label">RAM Usage</span>
+      <span class="stat-value" id="mem-usage">—</span>
+    </div>
+    <div class="bar-wrap"><div class="bar green" id="mem-bar" style="width:0%"></div></div>
+    <div class="stat-row">
+      <span class="stat-label">Used / Total</span>
+      <span class="stat-value blue" id="mem-detail">—</span>
+    </div>
+    <div class="stat-row" style="margin-top:10px">
+      <span class="stat-label">Swap Usage</span>
+      <span class="stat-value" id="swap-usage">—</span>
+    </div>
+    <div class="bar-wrap"><div class="bar yellow" id="swap-bar" style="width:0%"></div></div>
+    <div class="stat-row">
+      <span class="stat-label">Swap Used / Total</span>
+      <span class="stat-value" id="swap-detail">—</span>
+    </div>
+  </div>
+
+  <!-- Power -->
+  <div class="card">
+    <div class="card-title"><span>⚡</span> Power</div>
+    <div class="stat-row">
+      <span class="stat-label">Core Voltage</span>
+      <span class="stat-value green" id="power-voltage">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Current Draw</span>
+      <span class="stat-value yellow" id="power-watts">—</span>
+    </div>
+    <div class="stat-row" style="margin-top:10px">
+      <span class="stat-label">Hourly</span>
+      <span class="stat-value blue" id="power-hourly">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Monthly (est.)</span>
+      <span class="stat-value purple" id="power-monthly">—</span>
+    </div>
+    <div class="stat-row" style="margin-top:10px">
+      <span class="stat-label">Status</span>
+      <span class="stat-value" id="power-status">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Throttle Reason</span>
+      <span class="stat-value" id="power-reason">—</span>
+    </div>
+  </div>
+
+  <!-- Disks -->
+  <div class="card">
+    <div class="card-title"><span>◫</span> Disk</div>
+    <div id="disk-list"></div>
+  </div>
+
+  <!-- Network — full width -->
+  <div class="card full-width">
+    <div class="card-title"><span>⇅</span> Network</div>
+    <div class="net-grid" id="net-list"></div>
+  </div>
+
+  <!-- Processes — full width -->
+  <div class="card full-width">
+    <div class="card-title"><span>≡</span> Top Processes <span style="color:var(--muted);font-size:11px;margin-left:4px">(by CPU)</span></div>
+    <table class="proc-table">
+      <thead>
+        <tr>
+          <th>PID</th><th>NAME</th><th>CPU %</th><th>MEM (MB)</th><th>STATUS</th>
+        </tr>
+      </thead>
+      <tbody id="proc-tbody"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<footer>pi-vitals · updates every 2s via websocket</footer>
+
+<script>
+  const barColor = pct => pct > 85 ? 'red' : pct > 60 ? 'yellow' : 'green';
+  const valColor = pct => pct > 85 ? 'red' : pct > 60 ? 'yellow' : 'green';
+  const fmt1 = n => n.toFixed(1);
+  const fmtMb = mb => mb >= 1024 ? (mb/1024).toFixed(2)+' GB' : mb+' MB';
+
+  function formatUptime(secs) {
+    const d = Math.floor(secs/86400), h = Math.floor((secs%86400)/3600),
+          m = Math.floor((secs%3600)/60);
+    return d>0 ? `up ${d}d ${h}h ${m}m` : h>0 ? `up ${h}h ${m}m` : `up ${m}m`;
+  }
+
+  function setBar(id, pct) {
+    const el = document.getElementById(id);
+    el.style.width = pct+'%';
+    el.className = 'bar '+barColor(pct);
+  }
+
+  function setVal(id, txt, color) {
+    const el = document.getElementById(id);
+    el.textContent = txt;
+    if(color) el.className = 'stat-value '+color;
+  }
+
+  function render(d) {
+    // Header
+    document.getElementById('hostname').textContent = d.hostname;
+    document.getElementById('uptime').textContent = formatUptime(d.uptime);
+
+    // CPU
+    const cpuPct = fmt1(d.cpu.usage_percent);
+    setVal('cpu-usage', cpuPct+'%', valColor(d.cpu.usage_percent));
+    setBar('cpu-bar', d.cpu.usage_percent);
+    if(d.cpu.temperature_celsius != null) {
+      const t = d.cpu.temperature_celsius;
+      setVal('cpu-temp', fmt1(t)+'°C', t>75?'red':t>60?'yellow':'green');
+    } else {
+      setVal('cpu-temp', 'N/A', 'muted');
+    }
+    setVal('cpu-freq', d.cpu.frequency_mhz+' MHz');
+    setVal('cpu-cores', d.cpu.core_count);
+
+    // Memory
+    setVal('mem-usage', fmt1(d.memory.usage_percent)+'%', valColor(d.memory.usage_percent));
+    setBar('mem-bar', d.memory.usage_percent);
+    setVal('mem-detail', fmtMb(d.memory.used_mb)+' / '+fmtMb(d.memory.total_mb));
+    setVal('swap-usage', fmt1(d.memory.swap_percent)+'%', valColor(d.memory.swap_percent));
+    setBar('swap-bar', d.memory.swap_percent);
+    setVal('swap-detail', fmtMb(d.memory.swap_used_mb)+' / '+fmtMb(d.memory.swap_total_mb));
+
+    // Power
+    setVal('power-voltage', d.power.voltage != null ? fmt1(d.power.voltage)+'V' : 'N/A');
+    setVal('power-watts', fmt1(d.power.current_watts)+' W');
+    setVal('power-hourly', fmt1(d.power.hourly_wh)+' Wh');
+    setVal('power-monthly', d.power.monthly_kwh.toFixed(2)+' kWh');
+    setVal('power-status', d.power.throttled ? 'THROTTLED' : 'OK', d.power.throttled ? 'red' : 'green');
+    setVal('power-reason', d.power.throttle_reason, d.power.throttled ? 'yellow' : 'muted');
+
+    // Disks
+    document.getElementById('disk-list').innerHTML = d.disks.map(disk => `
+      <div style="margin-bottom:12px">
+        <div class="stat-row">
+          <span class="stat-label">${disk.mount}</span>
+          <span class="stat-value ${valColor(disk.usage_percent)}">${fmt1(disk.usage_percent)}%</span>
+        </div>
+        <div class="bar-wrap"><div class="bar ${barColor(disk.usage_percent)}" style="width:${disk.usage_percent}%"></div></div>
+        <div class="stat-row">
+          <span class="stat-label" style="font-size:11px">${disk.name}</span>
+          <span style="color:var(--muted);font-size:11px">${disk.used_gb} GB / ${disk.total_gb} GB</span>
+        </div>
+      </div>`).join('');
+
+    // Network
+    document.getElementById('net-list').innerHTML = d.network.interfaces.map(iface => `
+      <div class="net-iface">
+        <div class="net-name">${iface.name}</div>
+        <div class="stat-row">
+          <span class="stat-label">↓ RX</span>
+          <span class="stat-value green">${fmt1(iface.rx_kb_per_sec)} KB/s</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">↑ TX</span>
+          <span class="stat-value blue">${fmt1(iface.tx_kb_per_sec)} KB/s</span>
+        </div>
+        <div class="stat-row" style="margin-top:6px">
+          <span class="stat-label" style="font-size:11px">Total RX</span>
+          <span style="color:var(--muted);font-size:11px">${(iface.rx_bytes/1024/1024).toFixed(1)} MB</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label" style="font-size:11px">Total TX</span>
+          <span style="color:var(--muted);font-size:11px">${(iface.tx_bytes/1024/1024).toFixed(1)} MB</span>
+        </div>
+      </div>`).join('');
+
+    // Processes
+    document.getElementById('proc-tbody').innerHTML = d.processes.map(p => `
+      <tr>
+        <td style="color:var(--muted)">${p.pid}</td>
+        <td class="proc-name">${p.name}</td>
+        <td class="${p.cpu_percent>50?'red':p.cpu_percent>20?'yellow':'green'}" style="font-weight:bold">${fmt1(p.cpu_percent)}%</td>
+        <td style="color:var(--blue)">${p.memory_mb} MB</td>
+        <td style="color:var(--muted)">${p.status}</td>
+      </tr>`).join('');
+  }
+
+  function connect() {
+    const ws = new WebSocket(`ws://${location.host}/ws`);
+    const dot = document.getElementById('dot');
+    const statusText = document.getElementById('status-text');
+
+    ws.onopen = () => {
+      dot.className = 'live';
+      statusText.textContent = 'Live';
+    };
+    ws.onmessage = e => render(JSON.parse(e.data));
+    ws.onclose = () => {
+      dot.className = '';
+      statusText.textContent = 'Reconnecting...';
+      setTimeout(connect, 3000);
+    };
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+</script>
+</body>
+</html>

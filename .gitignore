@@ -1,0 +1,14 @@
+# Rust build output
+/target
+
+# Environment / local config overrides
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.iml
