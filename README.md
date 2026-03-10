@@ -6,6 +6,8 @@ Streams live CPU, memory, disk, network, process, and power telemetry from the P
 
 ![Dashboard](https://img.shields.io/badge/platform-Raspberry%20Pi-red) ![Language](https://img.shields.io/badge/language-Rust-orange) ![License](https://img.shields.io/badge/license-MIT-blue)
 
+![pi-vitals dashboard screenshot](pi-vitals-ss.png)
+
 ## Features
 
 - **CPU** — usage %, frequency, core count, temperature
